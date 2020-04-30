@@ -7,6 +7,7 @@
 # LICENSE file in the root directory of this source tree.
 
 import torch
+import numpy as np
 import torch.cuda
 import torch.nn as nn
 import torch.nn.functional as F
@@ -89,6 +90,7 @@ class Seq2Seq(nn.Module):
     return out.gather(1, idx).view(N, H)
 
   def decoder(self, encoded, y, h0=None, c0=None):
+    # print("y",y.size())
     V_in, V_out, D, H, L, N, T_in, T_out = self.get_dims(y=y)
 
     if T_out > 1:
@@ -162,6 +164,7 @@ class Seq2Seq(nn.Module):
     y = torch.LongTensor(N, T).fill_(self.NULL)
     done = torch.ByteTensor(N).fill_(0)
     cur_input = Variable(x.data.new(N, 1).fill_(self.START))
+    # print("curr", cur_input.size())
     h, c = None, None
     self.multinomial_outputs = []
     self.multinomial_probs = []
@@ -169,16 +172,21 @@ class Seq2Seq(nn.Module):
       # logprobs is N x 1 x V
       logprobs, h, c = self.decoder(encoded, cur_input, h0=h, c0=c)
       logprobs = logprobs / temperature
-      probs = F.softmax(logprobs.view(N, -1)) # Now N x V
+      probs = F.softmax(logprobs.view(N, -1), dim=1) # Now N x V
       if argmax:
         _, cur_output = probs.max(1)
+        # print("curr out", cur_output.unsqueeze(1).size())
+        cur_output = cur_output.unsqueeze(1)
       else:
         cur_output = probs.multinomial() # Now N x 1
       self.multinomial_outputs.append(cur_output)
       self.multinomial_probs.append(probs)
       cur_output_data = cur_output.data.cpu()
-      not_done = logical_not(done)
-      y[:, t][not_done] = cur_output_data[not_done]
+      # not_done = logical_not(done)
+      # y[not_done, t] = cur_output_data[not_done].squeeze()
+      # print(y.size(), cur_output_data.size(), not_done.size())
+      not_done = np.where(done.data.cpu().numpy() == 0)[0]
+      y[not_done, t] = cur_output_data[not_done].squeeze()
       done = logical_or(done, cur_output_data.cpu() == self.END)
       cur_input = cur_output
       if done.sum() == N:

@@ -30,10 +30,10 @@ from iep.models import ModuleNet, Seq2Seq, LstmModel, CnnLstmModel, CnnLstmSaMod
 parser = argparse.ArgumentParser()
 
 # Input data
-parser.add_argument('--train_question_h5', default='data/train_questions.h5')
-parser.add_argument('--train_features_h5', default='data/train_features.h5')
-parser.add_argument('--val_question_h5', default='data/val_questions.h5')
-parser.add_argument('--val_features_h5', default='data/val_features.h5')
+parser.add_argument('--train_question_h5', default='../../data/train_questions.h5')
+parser.add_argument('--train_features_h5', default='../../data/train_features.h5')
+parser.add_argument('--val_question_h5', default='../../data/val_questions.h5')
+parser.add_argument('--val_features_h5', default='../../data/val_features.h5')
 parser.add_argument('--feature_dim', default='1024,14,14')
 parser.add_argument('--vocab_json', default='data/vocab.json')
 
@@ -42,8 +42,8 @@ parser.add_argument('--use_local_copies', default=0, type=int)
 parser.add_argument('--cleanup_local_copies', default=1, type=int)
 
 parser.add_argument('--family_split_file', default=None)
-parser.add_argument('--num_train_samples', default=None, type=int)
-parser.add_argument('--num_val_samples', default=10000, type=int)
+parser.add_argument('--num_train_samples', default=45000, type=int)
+parser.add_argument('--num_val_samples', default=15000, type=int)
 parser.add_argument('--shuffle_train_data', default=1, type=int)
 
 # What type of model to use and which parts to train

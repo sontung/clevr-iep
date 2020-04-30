@@ -260,8 +260,9 @@ def run_our_model_batch(args, program_generator, execution_engine, loader, dtype
   for batch in loader:
     questions, images, feats, answers, programs, program_lists = batch
 
-    questions_var = Variable(questions.type(dtype).long(), volatile=True)
-    feats_var = Variable(feats.type(dtype), volatile=True)
+    with torch.no_grad():
+      questions_var = Variable(questions.type(dtype).long())
+      feats_var = Variable(feats.type(dtype))
 
     programs_pred = program_generator.reinforce_sample(
                         questions_var,
@@ -271,7 +272,7 @@ def run_our_model_batch(args, program_generator, execution_engine, loader, dtype
       scores = execution_engine(feats_var, program_lists)
     else:
       scores = execution_engine(feats_var, programs_pred)
-    probs = F.softmax(scores)
+    probs = F.softmax(scores, dim=1)
 
     _, preds = scores.data.cpu().max(1)
     all_programs.append(programs_pred.data.cpu().clone())
