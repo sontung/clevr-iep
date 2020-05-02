@@ -30,12 +30,12 @@ from iep.models import ModuleNet, Seq2Seq, LstmModel, CnnLstmModel, CnnLstmSaMod
 parser = argparse.ArgumentParser()
 
 # Input data
-parser.add_argument('--train_question_h5', default='../../data/train_questions.h5')
-parser.add_argument('--train_features_h5', default='../../data/train_features.h5')
-parser.add_argument('--val_question_h5', default='../../data/val_questions.h5')
-parser.add_argument('--val_features_h5', default='../../data/val_features.h5')
+parser.add_argument('--train_question_h5', default='../data/train_questions.h5')
+parser.add_argument('--train_features_h5', default='../data/train_features.h5')
+parser.add_argument('--val_question_h5', default='../data/val_questions.h5')
+parser.add_argument('--val_features_h5', default='../data/val_features.h5')
 parser.add_argument('--feature_dim', default='1024,14,14')
-parser.add_argument('--vocab_json', default='data/vocab.json')
+parser.add_argument('--vocab_json', default='../data/vocab.json')
 
 parser.add_argument('--loader_num_workers', type=int, default=1)
 parser.add_argument('--use_local_copies', default=0, type=int)
@@ -257,8 +257,8 @@ def train_loop(args, train_loader, val_loader):
           pg_optimizer.step()
 
       if t % args.record_loss_every == 0:
-        print(t, loss.data[0])
-        stats['train_losses'].append(loss.data[0])
+        # print(t, loss.item())
+        stats['train_losses'].append(loss.item())
         stats['train_losses_ts'].append(t)
         if reward is not None:
           stats['train_rewards'].append(reward)
@@ -283,26 +283,26 @@ def train_loop(args, train_loader, val_loader):
           best_ee_state = get_state(execution_engine)
           best_baseline_state = get_state(baseline_model)
 
-        checkpoint = {
-          'args': args.__dict__,
-          'program_generator_kwargs': pg_kwargs,
-          'program_generator_state': best_pg_state,
-          'execution_engine_kwargs': ee_kwargs,
-          'execution_engine_state': best_ee_state,
-          'baseline_kwargs': baseline_kwargs,
-          'baseline_state': best_baseline_state,
-          'baseline_type': baseline_type,
-          'vocab': vocab
-        }
-        for k, v in stats.items():
-          checkpoint[k] = v
-        print('Saving checkpoint to %s' % args.checkpoint_path)
-        torch.save(checkpoint, args.checkpoint_path)
-        del checkpoint['program_generator_state']
-        del checkpoint['execution_engine_state']
-        del checkpoint['baseline_state']
-        with open(args.checkpoint_path + '.json', 'w') as f:
-          json.dump(checkpoint, f)
+        # checkpoint = {
+        #   'args': args.__dict__,
+        #   'program_generator_kwargs': pg_kwargs,
+        #   'program_generator_state': best_pg_state,
+        #   'execution_engine_kwargs': ee_kwargs,
+        #   'execution_engine_state': best_ee_state,
+        #   'baseline_kwargs': baseline_kwargs,
+        #   'baseline_state': best_baseline_state,
+        #   'baseline_type': baseline_type,
+        #   'vocab': vocab
+        # }
+        # for k, v in stats.items():
+        #   checkpoint[k] = v
+        # print('Saving checkpoint to %s' % args.checkpoint_path)
+        # torch.save(checkpoint, args.checkpoint_path)
+        # del checkpoint['program_generator_state']
+        # del checkpoint['execution_engine_state']
+        # del checkpoint['baseline_state']
+        # with open(args.checkpoint_path + '.json', 'w') as f:
+        #   json.dump(checkpoint, f)
 
       if t == args.num_iterations:
         break
@@ -444,41 +444,43 @@ def set_mode(mode, models):
 def check_accuracy(args, program_generator, execution_engine, baseline_model, loader):
   set_mode('eval', [program_generator, execution_engine, baseline_model])
   num_correct, num_samples = 0, 0
-  for batch in loader:
-    questions, _, feats, answers, programs, _ = batch
 
-    questions_var = Variable(questions.cuda(), volatile=True)
-    feats_var = Variable(feats.cuda(), volatile=True)
-    answers_var = Variable(feats.cuda(), volatile=True)
-    if programs[0] is not None:
-      programs_var = Variable(programs.cuda(), volatile=True)
+  with torch.no_grad():
+    for batch in loader:
+      questions, _, feats, answers, programs, _ = batch
 
-    scores = None # Use this for everything but PG
-    if args.model_type == 'PG':
-      vocab = utils.load_vocab(args.vocab_json)
-      for i in range(questions.size(0)):
-        program_pred = program_generator.sample(Variable(questions[i:i+1].cuda(), volatile=True))
-        program_pred_str = iep.preprocess.decode(program_pred, vocab['program_idx_to_token'])
-        program_str = iep.preprocess.decode(programs[i], vocab['program_idx_to_token'])
-        if program_pred_str == program_str:
-          num_correct += 1
-        num_samples += 1
-    elif args.model_type == 'EE':
-        scores = execution_engine(feats_var, programs_var)
-    elif args.model_type == 'PG+EE':
-      programs_pred = program_generator.reinforce_sample(
-                          questions_var, argmax=True)
-      scores = execution_engine(feats_var, programs_pred)
-    elif args.model_type in ['LSTM', 'CNN+LSTM', 'CNN+LSTM+SA']:
-      scores = baseline_model(questions_var, feats_var)
+      questions_var = Variable(questions.cuda())
+      feats_var = Variable(feats.cuda())
+      answers_var = Variable(feats.cuda())
+      if programs[0] is not None:
+        programs_var = Variable(programs.cuda())
 
-    if scores is not None:
-      _, preds = scores.data.cpu().max(1)
-      num_correct += (preds == answers).sum()
-      num_samples += preds.size(0)
+      scores = None # Use this for everything but PG
+      if args.model_type == 'PG':
+        vocab = utils.load_vocab(args.vocab_json)
+        for i in range(questions.size(0)):
+          program_pred = program_generator.sample(Variable(questions[i:i+1].cuda()))
+          program_pred_str = iep.preprocess.decode(program_pred, vocab['program_idx_to_token'])
+          program_str = iep.preprocess.decode(programs[i], vocab['program_idx_to_token'])
+          if program_pred_str == program_str:
+            num_correct += 1
+          num_samples += 1
+      elif args.model_type == 'EE':
+          scores = execution_engine(feats_var, programs_var)
+      elif args.model_type == 'PG+EE':
+        programs_pred = program_generator.reinforce_sample(
+                            questions_var, argmax=True)
+        scores = execution_engine(feats_var, programs_pred)
+      elif args.model_type in ['LSTM', 'CNN+LSTM', 'CNN+LSTM+SA']:
+        scores = baseline_model(questions_var, feats_var)
 
-    if num_samples >= args.num_val_samples:
-      break
+      if scores is not None:
+        _, preds = scores.data.cpu().max(1)
+        num_correct += (preds == answers).sum()
+        num_samples += preds.size(0)
+
+      if num_samples >= args.num_val_samples:
+        break
 
   set_mode('train', [program_generator, execution_engine, baseline_model])
   acc = float(num_correct) / num_samples

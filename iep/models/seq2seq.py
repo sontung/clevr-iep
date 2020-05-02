@@ -178,7 +178,7 @@ class Seq2Seq(nn.Module):
         # print("curr out", cur_output.unsqueeze(1).size())
         cur_output = cur_output.unsqueeze(1)
       else:
-        cur_output = probs.multinomial() # Now N x 1
+        cur_output = probs.multinomial(1) # Now N x 1
       self.multinomial_outputs.append(cur_output)
       self.multinomial_probs.append(probs)
       cur_output_data = cur_output.data.cpu()
